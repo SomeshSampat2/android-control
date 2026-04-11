@@ -37,6 +37,8 @@ This MCP server works with any IDE that supports the Model Context Protocol (MCP
 - **Cursor** - AI-first code editor
 - **Claude Desktop** - Anthropic's official Claude app
 - **Antigravity** - AI development environment
+- **Kiro Ide** - AI-enhanced development environment
+- **Codex** - AI-powered coding assistant
 - **Any other MCP-compatible IDE**
 
 **For Windsurf, Cursor, or Claude Desktop:**
