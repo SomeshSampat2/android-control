@@ -1,0 +1,84 @@
+{
+  "manifest_version": "0.2",
+  "name": "Android-MCP",
+  "version": "0.1.0",
+  "description": "Lightweight MCP Server for Android Operating System",
+  "long_description": "Android-MCP is a lightweight, open-source tool that bridge between AI agents and Android devices. Running as an MCP server, it lets LLM agents perform real-world tasks such as **app navigation, UI interaction and automated QA testing** without relying on traditional computer-vision pipelines or preprogramed scripts.\n\n**KEY FEATURES**\n- **Native Android Integration**: Interact with UI elements via ADB and the Android Accessibility API.\n- **Bring Your Own LLM/VLM**: Works with any language model.\n- **Rich Toolset for Mobile Automation**: Pre-built tools for gestures, keystrokes, capture, device state, etc.\n- **Real-Time Interaction**: Typical latency between actions ranges 2-4s.\n\n**MINIMUM REQUIREMENTS**\n- Python 3.13\n- Android Debug Bridge (ADB)\nEnsure ADB is installed and your device is connected/authorized.\n- UV Package Manager\nThis MCP server requires UV, a fast Python package manager.\nInstallation:\n`curl -LsSf https://astral.sh/uv/install.sh | sh`\nFor detailed installation instructions, [see the UV documentation](https://github.com/astral-sh/uv)\n\n**WINDOWS NOTE**\nUse Python 3.13 for `uvx` on Windows. Python 3.14 currently fails to resolve a transitive `pywin32` dependency from the MCP stack.",
+  "server": {
+    "type": "python",
+    "entry_point": "./src/android_mcp/__main__.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "${__dirname}",
+        "run",
+        "android-mcp"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "ListDevices",
+      "description": "List available ADB devices and their connection state."
+    },
+    {
+      "name": "ConnectDevice",
+      "description": "Connect to an ADB device by serial number."
+    },
+    {
+      "name": "Click",
+      "description": "Click on a specific cordinate (x, y)."
+    },
+    {
+      "name": "Snapshot",
+      "description": "Get the state of the device. Optionally includes visual screenshot when use_vision=True. Returns tree state string and screenshot if requested."
+    },
+    {
+      "name": "LongClick",
+      "description": "Long click on a specific cordinate (x, y)."
+    },
+    {
+      "name": "Swipe",
+      "description": "Swipe from one coordinate (x1, y1) to another (x2, y2)."
+    },
+    {
+      "name": "Type",
+      "description": "Type text on a specific cordinate (x, y). Can clear existing text if clear=True."
+    },
+    {
+      "name": "Drag",
+      "description": "Drag from location (x1, y1) and drop on another location (x2, y2)."
+    },
+    {
+      "name": "Press",
+      "description": "Press on specific button on the device (e.g. Back, Home, etc)."
+    },
+    {
+      "name": "Notification",
+      "description": "Access the notifications seen on the device."
+    },
+    {
+      "name": "Wait",
+      "description": "Wait for a specific amount of time (seconds)."
+    }
+  ],
+  "compatibility": {
+    "platforms": [
+      "win32",
+      "linux",
+      "darwin"
+    ],
+    "runtimes": {
+      "python": ">=3.13,<3.14"
+    }
+  },
+  "keywords": [
+    "android",
+    "automation",
+    "ai",
+    "mcp",
+    "mobile"
+  ],
+  "license": "MIT"
+}
