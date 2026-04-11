@@ -186,6 +186,14 @@ Claude can access the following tools to interact with Android:
 - `ListDevices`: List available ADB devices and their connection state.
 - `ConnectDevice`: Connect to an ADB device by serial number.
 - `Device`: Manage ADB devices (list, connect, or disconnect).
+- `GetDeviceInfo`: Get detailed device information (model, Android version, resolution, etc.).
+
+**App Management:**
+- `LaunchApp`: Launch a specific app by package name.
+- `StopApp`: Stop/force-stop a specific app.
+- `GetCurrentApp`: Get the currently running app package and activity.
+- `ListApps`: List all installed apps (limited to first 50).
+- `WaitForActivity`: Wait for a specific activity to be in foreground.
 
 **Interaction Tools:**
 - `Click`: Click on a specific coordinate (x, y).
@@ -194,13 +202,48 @@ Claude can access the following tools to interact with Android:
 - `Drag`: Drag from location (x1, y1) and drop on another location (x2, y2).
 - `Type`: Type text on a specific coordinate (x, y). Can clear existing text if clear=True.
 - `Press`: Press on specific button on the device (Back, Home, etc).
+- `PressKey`: Press a physical key (home, back, volume_up, volume_down, etc.).
 - `ClickBySelector`: Click on an element by selector (text, resourceId, className, description). More reliable than coordinate clicks.
+- `MultiTap`: Tap multiple times rapidly at a location.
+- `Scroll`: Scroll in a specific direction (up, down, left, right).
+- `ScrollToElement`: Scroll until an element is found.
+- `SwipeElement`: Swipe on a specific element.
+- `PullToRefresh`: Perform a pull-to-refresh gesture by scrolling to top and pulling down significantly to trigger refresh.
 
 **State & Observation:**
 - `Snapshot`: Get the state of the device. Optionally includes visual screenshot when use_vision=True.
 - `Notification`: Access the notifications seen on the device.
 - `Wait`: Wait for a specific amount of time (seconds).
 - `WaitForElement`: Wait for an element to appear on screen using selectors.
+- `VerifyText`: Verify if text exists on screen.
+- `GetElementInfo`: Get detailed information about an element by selector.
+- `GetElementParent`: Get parent of an element by selector.
+- `TakeScreenshot`: Take a screenshot and save to device.
+
+**Clipboard Operations:**
+- `GetClipboard`: Get text from clipboard.
+- `SetClipboard`: Set text to clipboard.
+
+**Testing & Debugging:**
+- `ExecuteShell`: Execute a shell command on device.
+- `GetLogs`: Get Android logcat logs.
+- `ClearLogs`: Clear logcat buffer.
+
+**System Control:**
+- `ToggleWiFi`: Turn WiFi on or off.
+- `SetOrientation`: Set screen orientation (portrait, landscape, auto).
+
+**System Information:**
+- `GetBatteryInfo`: Get battery information.
+- `GetNetworkInfo`: Get network connection information.
+
+**Network Inspection:**
+- `GetAPILogs`: Get logs related to API calls from the app. Filters logcat for HTTP requests, network operations, and API calls.
+- `StartAPILogger`: Start logging API requests/responses by clearing logs and preparing for capture.
+- `StopAPILogger`: Stop logging API requests/responses and return captured data with formatted output.
+- `GetAPIResponse`: Extract response data from API logs. Use after StopAPILogger to get specific response details.
+- `SetProxy`: Set HTTP/HTTPS proxy for device to intercept API traffic (requires proxy server like Charles/Fiddler).
+- `ClearProxy`: Clear HTTP/HTTPS proxy settings from device.
 
 ## ⚙️ Environment Variables
 
