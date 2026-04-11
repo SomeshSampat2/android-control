@@ -189,7 +189,7 @@ async def lifespan(app: FastMCP):
     yield
 
 
-mcp = FastMCP(name="Android-MCP", instructions=instructions)
+mcp = FastMCP(name="Android-Control", instructions=instructions)
 mobile = Mobile()
 
 
