@@ -1,6 +1,6 @@
-# Android MCP
+# Android Control
 
-Android-MCP is a lightweight, open-source tool that bridges between AI agents and Android devices. Running as an MCP server, it lets LLM agents perform real-world tasks such as **app navigation, UI interaction and automated QA testing** without relying on traditional computer-vision pipelines or preprogramed scripts.
+Android-Control is a lightweight, open-source tool that bridges between AI agents and Android devices. Running as an MCP server, it lets LLM agents perform real-world tasks such as **app navigation, UI interaction and automated QA testing** without relying on traditional computer-vision pipelines or preprogramed scripts.
 
 ## ✨ Features
 
@@ -53,7 +53,7 @@ adb devices
 
 ### 🏁 Getting Started
 
-You can run the Android MCP server using **UVX** (recommended) or **UV** (for local development).
+You can run the Android Control server using **UVX** (recommended) or **UV** (for local development).
 
 #### Option 1: UVX (Recommended)
 
@@ -69,12 +69,12 @@ No need to install dependencies manually. Just configure Claude Desktop:
    ```json
    {
      "mcpServers": {
-       "android-mcp": {
+       "android-control": {
          "command": "uvx",
          "args": [
            "--python",
            "3.13",
-           "android-mcp"
+           "android-control"
          ]
        }
      }
@@ -87,12 +87,12 @@ No need to install dependencies manually. Just configure Claude Desktop:
    ```json
    {
      "mcpServers": {
-       "android-mcp": {
+       "android-control": {
          "command": "uvx",
          "args": [
            "--python",
            "3.13",
-           "android-mcp"
+           "android-control"
          ],
          "env": {
            "ANDROID_MCP_CONNECTION": "wifi",
@@ -108,12 +108,12 @@ No need to install dependencies manually. Just configure Claude Desktop:
    ```json
    {
      "mcpServers": {
-       "android-mcp": {
+       "android-control": {
          "command": "uvx",
          "args": [
            "--python",
            "3.13",
-           "android-mcp",
+           "android-control",
            "--wifi",
            "192.168.1.3"
          ]
@@ -135,13 +135,13 @@ No need to install dependencies manually. Just configure Claude Desktop:
    ```json
    {
      "mcpServers": {
-       "android-mcp": {
+       "android-control": {
          "command": "uv",
          "args": [
            "--directory",
            "/Users/ssampat/Documents/MCPs/mcps/android-control",
            "run",
-           "android-mcp"
+           "android-control"
          ]
        }
      }
@@ -152,7 +152,7 @@ No need to install dependencies manually. Just configure Claude Desktop:
 
 ### 🔌 Device Selection
 
-Android-MCP resolves devices lazily when a tool is called, so the MCP server can start even if no device is available yet.
+Android-Control resolves devices lazily when a tool is called, so the MCP server can start even if no device is available yet.
 
 - `--device RFCN2013V8D`: connect to a specific USB serial
 - `--device 192.168.1.3:5555`: connect to a specific WiFi ADB target
@@ -168,13 +168,13 @@ Supported environment variables:
 - `ANDROID_MCP_CONNECTION`: `auto`, `usb`, or `wifi`
 - `ANDROID_MCP_HOST`: WiFi host, with `:5555` added automatically when omitted
 
-If nothing is configured, Android-MCP will use the first available ADB device reported by `adb devices`. If none are available, tool calls return a configuration error instead of crashing the MCP handshake.
+If nothing is configured, Android-Control will use the first available ADB device reported by `adb devices`. If none are available, tool calls return a configuration error instead of crashing the MCP handshake.
 
 3. **Restart the Claude Desktop**
 
-Restart your Claude Desktop. You should see "android-mcp" listed as an available integration. That's it, now you're ready to start controlling your Android device with natural language.
+Restart your Claude Desktop. You should see "android-control" listed as an available integration. That's it, now you're ready to start controlling your Android device with natural language.
 
-For troubleshooting tips (log locations, common ADB issues), see the [MCP docs](https://modelcontextprotocol.io/quickstart/server#android-mcp-integration-issues).
+For troubleshooting tips (log locations, common ADB issues), see the [MCP docs](https://modelcontextprotocol.io/quickstart/server#android-control-integration-issues).
 
 ---
 
@@ -208,7 +208,7 @@ Claude can access the following tools to interact with Android:
 
 ## ⚠️ Caution
 
-Android-MCP can execute arbitrary UI actions on your mobile device. Use it in controlled environments (emulators, test devices) when running untrusted prompts or agents.
+Android-Control can execute arbitrary UI actions on your mobile device. Use it in controlled environments (emulators, test devices) when running untrusted prompts or agents.
 
 ## Contributing
 
