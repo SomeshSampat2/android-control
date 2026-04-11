@@ -1,7 +1,5 @@
 # Android Control
 
-**Based on:** [Android-MCP](https://github.com/CursorTouch/Android-MCP) by CursorTouch
-
 A simple tool that lets AI assistants control Android devices. You can use it to automate apps, tap buttons, type text, and more - just by asking in plain English.
 
 ## What You Need
@@ -139,4 +137,8 @@ This tool can control your phone. Use it carefully, especially with untrusted AI
 
 ## License
 
-MIT License - free to use for any purpose.
+Apache License 2.0 - free to use for any purpose.
+
+## Inspired By
+
+This project was inspired by [Android-MCP](https://github.com/CursorTouch/Android-MCP) by CursorTouch.
