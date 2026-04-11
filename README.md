@@ -29,13 +29,24 @@ adb devices
 
 You should see your device listed. If not, enable USB debugging in your phone's developer settings.
 
-### Step 3: Configure Claude Desktop
+### Step 3: Configure Your IDE
 
-Find your Claude Desktop config file:
+This MCP server works with any IDE that supports the Model Context Protocol (MCP), including:
+
+- **Windsurf** - Modern AI-powered code editor
+- **Cursor** - AI-first code editor
+- **Claude Desktop** - Anthropic's official Claude app
+- **Antigravity** - AI development environment
+- **Any other MCP-compatible IDE**
+
+**For Windsurf, Cursor, or Claude Desktop:**
+
+Find your MCP config file:
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 - Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windsurf/Cursor may use similar paths in their config directories
 
-Add this to the file:
+Add this to your MCP config:
 
 ```json
 {
@@ -54,13 +65,16 @@ Add this to the file:
 }
 ```
 
-### Step 4: Restart Claude Desktop
+**For other IDEs:**
+Check your IDE's documentation for MCP configuration. Most follow a similar JSON-based configuration format.
 
-That's it! You can now control your Android device with Claude.
+### Step 4: Restart Your IDE
+
+Restart your IDE to load the MCP server. You should now be able to control your Android device with AI assistance.
 
 ## What You Can Do
 
-Claude can use these tools to control your phone:
+AI assistants can use these tools to control your phone:
 
 **Basic Actions:**
 - Click, tap, and long press on screen elements
