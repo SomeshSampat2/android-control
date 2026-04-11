@@ -126,8 +126,8 @@ No need to install dependencies manually. Just configure Claude Desktop:
 
 1. **Clone and Install**
    ```shell
-   git clone <your-repository-url>
-   cd <repository-directory>
+   git clone https://github.com/SomeshSampat2/android-control.git
+   cd android-control
    uv sync
    ```
 
@@ -139,7 +139,7 @@ No need to install dependencies manually. Just configure Claude Desktop:
          "command": "uv",
          "args": [
            "--directory",
-           "</PATH/TO/Android-MCP>",
+           "/Users/ssampat/Documents/MCPs/mcps/android-control",
            "run",
            "android-mcp"
          ]
@@ -147,7 +147,7 @@ No need to install dependencies manually. Just configure Claude Desktop:
      }
    }
    ```
-   > **Note:** Replace `</PATH/TO/Android-MCP>` with the full path to your cloned directory. You can also add `"--device", "<YOUR_DEVICE_serial>"`, `"--wifi", "192.168.1.3"`, or `"--usb"` to control device selection.
+   > **Note:** Replace the directory path with your actual cloned directory path. You can also add `"--device", "<YOUR_DEVICE_serial>"`, `"--wifi", "192.168.1.3"`, or `"--usb"` to control device selection.
    > `uv sync` follows the repo's `.python-version`, so local development uses Python 3.13 by default.
 
 ### 🔌 Device Selection
@@ -180,19 +180,27 @@ For troubleshooting tips (log locations, common ADB issues), see the [MCP docs](
 
 ## 🛠️ Available Tools
 
-Claude can access the following tools to interact with Windows:
+Claude can access the following tools to interact with Android:
 
-- `State-Tool`: To understand the state of the device.
-- `Click-Tool`: Click on the screen at the given coordinates.
-- `Long-Click-Tool`: Perform long click on the screen at the given coordinates.
-- `Type-Tool`: Type text on the specified coordinates (optionally clears existing text).
-- `Swipe-Tool`: Perform swipe from one location to other.
-- `Drag-Tool`: Drag from one point to another.
-- `Press-Tool`: To press the keys on the mobile device (Back, Volume Up, ...etc).
-- `Wait-Tool`: Pause for a defined duration.
-- `State-Tool`: Combined snapshot of active apps and interactive UI elements.
-- `Notification-Tool`: To access the notifications seen on the device.
-- `Shell-Tool`: To execute shell commands on the android device.
+**Device Management:**
+- `ListDevices`: List available ADB devices and their connection state.
+- `ConnectDevice`: Connect to an ADB device by serial number.
+- `Device`: Manage ADB devices (list, connect, or disconnect).
+
+**Interaction Tools:**
+- `Click`: Click on a specific coordinate (x, y).
+- `LongClick`: Long click on a specific coordinate (x, y).
+- `Swipe`: Swipe from one coordinate (x1, y1) to another (x2, y2).
+- `Drag`: Drag from location (x1, y1) and drop on another location (x2, y2).
+- `Type`: Type text on a specific coordinate (x, y). Can clear existing text if clear=True.
+- `Press`: Press on specific button on the device (Back, Home, etc).
+- `ClickBySelector`: Click on an element by selector (text, resourceId, className, description). More reliable than coordinate clicks.
+
+**State & Observation:**
+- `Snapshot`: Get the state of the device. Optionally includes visual screenshot when use_vision=True.
+- `Notification`: Access the notifications seen on the device.
+- `Wait`: Wait for a specific amount of time (seconds).
+- `WaitForElement`: Wait for an element to appear on screen using selectors.
 
 ## ⚙️ Environment Variables
 
