@@ -474,6 +474,171 @@ def multi_tap_tool(x: int, y: int, count: int = 2):
     except Exception as e:
         return f"Error multi-tapping: {str(e)}"
 
+
+# Helper functions for multi-click and multi-fill text tools
+def _execute_coordinate_click(device, x: int, y: int):
+    device.click(x, y)
+    return f"Clicked on ({x}, {y})"
+
+def _execute_selector_click(device, text: str = None, resourceId: str = None, className: str = None, description: str = None, index: int = 0, timeout: float = 5.0):
+    kwargs = {}
+    if text: kwargs['text'] = text
+    if resourceId: kwargs['resourceId'] = _resolve_resource_id(device, resourceId)
+    if className: kwargs['className'] = className
+    if description: kwargs['description'] = description
+    if not kwargs:
+        raise ValueError('At least one selector (text, resourceId, className, description) must be provided')
+    if index: kwargs['index'] = index
+    el = device(**kwargs)
+    if not el.wait(timeout=timeout):
+        raise ValueError(f'Element not found with selectors {kwargs} within {timeout}s')
+    el.click()
+    return f'Clicked element matching {kwargs}'
+
+def _execute_coordinate_fill_text(device, text: str, x: int, y: int):
+    device.set_fastinput_ime(enable=True)
+    device.send_keys(text=text, clear=True)
+    return f'Typed "{text}" at ({x}, {y})'
+
+def _execute_selector_fill_text(device, text: str, text_selector: str = None, resourceId: str = None, className: str = None, description: str = None, index: int = 0, timeout: float = 5.0):
+    kwargs = {}
+    if text_selector: kwargs['text'] = text_selector
+    if resourceId: kwargs['resourceId'] = _resolve_resource_id(device, resourceId)
+    if className: kwargs['className'] = className
+    if description: kwargs['description'] = description
+    if not kwargs:
+        raise ValueError('At least one selector (text, resourceId, className, description) must be provided')
+    if index: kwargs['index'] = index
+    el = device(**kwargs)
+    if not el.wait(timeout=timeout):
+        raise ValueError(f'Element not found with selectors {kwargs} within {timeout}s')
+    el.click()
+    device.set_fastinput_ime(enable=True)
+    device.send_keys(text=text, clear=True)
+    return f'Typed "{text}" in element matching {kwargs}'
+
+@mcp.tool(name='MultiClick', description='Click on multiple coordinates or elements in a single operation. Supports both coordinate-based (x, y) and selector-based (text, resourceId, className, description) actions. Continues execution even if individual actions fail.', annotations=ToolAnnotations(title="Multi Click", destructiveHint=True))
+def multi_click_tool(actions: list):
+    try:
+        device = require_device()
+        results = []
+        successful = 0
+        failed = 0
+        
+        for i, action in enumerate(actions):
+            action_type = action.get('type')
+            result = {
+                'index': i,
+                'type': action_type,
+                'status': 'success',
+                'details': ''
+            }
+            
+            try:
+                if action_type == 'coordinate':
+                    x = action.get('x')
+                    y = action.get('y')
+                    if x is None or y is None:
+                        raise ValueError('Coordinate actions require x and y parameters')
+                    result['details'] = _execute_coordinate_click(device, x, y)
+                    successful += 1
+                elif action_type == 'selector':
+                    text = action.get('text')
+                    resourceId = action.get('resourceId')
+                    className = action.get('className')
+                    description = action.get('description')
+                    index = action.get('index', 0)
+                    timeout = action.get('timeout', 5.0)
+                    result['details'] = _execute_selector_click(device, text, resourceId, className, description, index, timeout)
+                    successful += 1
+                else:
+                    raise ValueError(f'Unknown action type: {action_type}. Use "coordinate" or "selector"')
+            except Exception as e:
+                result['status'] = 'failed'
+                result['error'] = str(e)
+                result['details'] = action
+                failed += 1
+            
+            results.append(result)
+        
+        output = f"MultiClick completed: {successful}/{len(actions)} successful, {failed} failed\n"
+        output += "Results:\n"
+        for r in results:
+            status_emoji = "✓" if r['status'] == 'success' else "✗"
+            output += f"  {status_emoji} Action {r['index']} ({r['type']}): {r['status']}\n"
+            if r['status'] == 'failed':
+                output += f"    Error: {r.get('error', 'Unknown error')}\n"
+            else:
+                output += f"    {r['details']}\n"
+        
+        return output
+    except Exception as e:
+        return f"Error in MultiClick: {str(e)}"
+
+@mcp.tool(name='MultiFillText', description='Fill text in multiple form fields in a single operation. Each field is cleared before typing. Supports both coordinate-based (x, y) and selector-based (text, resourceId, className, description) actions. Continues execution even if individual actions fail.', annotations=ToolAnnotations(title="Multi Fill Text", destructiveHint=True))
+def multi_fill_text_tool(actions: list):
+    try:
+        device = require_device()
+        device.set_fastinput_ime(enable=True)
+        results = []
+        successful = 0
+        failed = 0
+        
+        for i, action in enumerate(actions):
+            action_type = action.get('type')
+            text = action.get('text')
+            result = {
+                'index': i,
+                'type': action_type,
+                'text': text,
+                'status': 'success',
+                'details': ''
+            }
+            
+            try:
+                if text is None:
+                    raise ValueError('All actions require a text parameter')
+                
+                if action_type == 'coordinate':
+                    x = action.get('x')
+                    y = action.get('y')
+                    if x is None or y is None:
+                        raise ValueError('Coordinate actions require x and y parameters')
+                    result['details'] = _execute_coordinate_fill_text(device, text, x, y)
+                    successful += 1
+                elif action_type == 'selector':
+                    text_selector = action.get('text_selector')
+                    resourceId = action.get('resourceId')
+                    className = action.get('className')
+                    description = action.get('description')
+                    index = action.get('index', 0)
+                    timeout = action.get('timeout', 5.0)
+                    result['details'] = _execute_selector_fill_text(device, text, text_selector, resourceId, className, description, index, timeout)
+                    successful += 1
+                else:
+                    raise ValueError(f'Unknown action type: {action_type}. Use "coordinate" or "selector"')
+            except Exception as e:
+                result['status'] = 'failed'
+                result['error'] = str(e)
+                result['details'] = action
+                failed += 1
+            
+            results.append(result)
+        
+        output = f"MultiFillText completed: {successful}/{len(actions)} successful, {failed} failed\n"
+        output += "Results:\n"
+        for r in results:
+            status_emoji = "✓" if r['status'] == 'success' else "✗"
+            output += f"  {status_emoji} Action {r['index']} ({r['type']}): {r['status']}\n"
+            if r['status'] == 'failed':
+                output += f"    Error: {r.get('error', 'Unknown error')}\n"
+            else:
+                output += f"    {r['details']}\n"
+        
+        return output
+    except Exception as e:
+        return f"Error in MultiFillText: {str(e)}"
+
 @mcp.tool(name='ScrollToElement', description='Scroll until an element is found', annotations=ToolAnnotations(title="Scroll To Element", destructiveHint=True))
 def scroll_to_element_tool(text: str = None, resourceId: str = None, max_scrolls: int = 5):
     try:

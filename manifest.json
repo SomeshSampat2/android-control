@@ -91,6 +91,14 @@
       "description": "Tap multiple times rapidly at a location."
     },
     {
+      "name": "MultiClick",
+      "description": "Click on multiple coordinates or elements in a single operation. Supports both coordinate-based (x, y) and selector-based (text, resourceId, className, description) actions. Continues execution even if individual actions fail."
+    },
+    {
+      "name": "MultiFillText",
+      "description": "Fill text in multiple form fields in a single operation. Each field is cleared before typing. Supports both coordinate-based (x, y) and selector-based (text, resourceId, className, description) actions. Continues execution even if individual actions fail."
+    },
+    {
       "name": "Scroll",
       "description": "Scroll in a specific direction (up, down, left, right)."
     },
