@@ -2,6 +2,12 @@
 
 A simple tool that lets AI assistants control Android devices. You can use it to automate apps, tap buttons, type text, and more - just by asking in plain English.
 
+## Prerequisites
+
+- **Python 3.13** - Required (install from python.org)
+- **UV** - Python package manager (install: `curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- **ADB** - Android Debug Bridge (part of Android SDK Platform Tools)
+
 ## What You Need
 
 - Python 3.13
