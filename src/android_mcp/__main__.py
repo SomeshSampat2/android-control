@@ -13,6 +13,7 @@ from fastmcp.utilities.types import Image
 from mcp.types import ToolAnnotations
 
 from android_mcp.mobile.service import Mobile
+from android_mcp.jev.service import Jev, JevNotConfigured
 
 parser = ArgumentParser()
 parser.add_argument("--device", type=str, help="ADB device serial or host:port")
@@ -193,39 +194,12 @@ async def lifespan(app: FastMCP):
 
 mcp = FastMCP(name="Android-Control", instructions=instructions)
 mobile = Mobile()
+jev = Jev(mobile)
 
 
 def require_device():
     _connect_preferred_device()
     return mobile.get_device()
-
-def _resolve_resource_id(device, resource_id: str) -> str:
-    """Auto-expand short resourceId (e.g. 'btn_login') to full form (e.g. 'com.example.app:id/btn_login') using the current foreground app package."""
-    if not resource_id or '/' in resource_id or ':' in resource_id:
-        return resource_id
-    try:
-        pkg = device.app_current().get('package', '')
-    except Exception:
-        pkg = ''
-    if pkg:
-        return f'{pkg}:id/{resource_id}'
-    return resource_id
-
-@mcp.tool(name='ListDevices',description='List available ADB devices',annotations=ToolAnnotations(title="List Devices",readOnlyHint=True))
-def list_devices_tool():
-    devices=Mobile.list_devices()
-    if not devices:
-        return "No devices found. Ensure a device is connected and ADB is running."
-    lines=[f"{serial}\t{state}" for serial,state in devices]
-    return "\n".join(lines)
-
-@mcp.tool(name='ConnectDevice',description='Connect to an ADB device by serial number',annotations=ToolAnnotations(title="Connect Device"))
-def connect_device_tool(serial:str):
-    target = Mobile.normalize_wifi_serial(serial) if ":" in serial else serial
-    if ":" in target:
-        Mobile.adb_connect(target)
-    mobile.connect(target)
-    return f'Connected to {target}'
 
 @mcp.tool(
     name="Device",
@@ -271,23 +245,6 @@ def click_tool(x: int, y: int):
     return f"Clicked on ({x},{y})"
 
 
-@mcp.tool(name='ClickBySelector',description='Click on an element by selector (text, resourceId, className, description). More reliable than coordinate clicks — handles dynamic layouts and element reflow. At least one selector must be provided.',annotations=ToolAnnotations(title="Click By Selector",destructiveHint=True))
-def click_by_selector_tool(text:str=None,resourceId:str=None,className:str=None,description:str=None,index:int=0,timeout:float=5.0):
-    device=require_device()
-    kwargs={}
-    if text: kwargs['text']=text
-    if resourceId: kwargs['resourceId']=_resolve_resource_id(device, resourceId)
-    if className: kwargs['className']=className
-    if description: kwargs['description']=description
-    if not kwargs:
-        return 'Error: at least one selector (text, resourceId, className, description) must be provided'
-    if index: kwargs['index']=index
-    el=device(**kwargs)
-    if not el.wait(timeout=timeout):
-        return f'Element not found with selectors {kwargs} within {timeout}s'
-    el.click()
-    return f'Clicked element matching {kwargs}'
-
 @mcp.tool(
     name="Snapshot",
     description="Get the state of the device. Optionally includes visual screenshot when use_vision=True. The use_annotation parameter (default True) can be set to False to get a clean screenshot without bounding boxes.",
@@ -325,17 +282,6 @@ def swipe_tool(x1: int, y1: int, x2: int, y2: int):
     return f"Swiped from ({x1},{y1}) to ({x2},{y2})"
 
 
-@mcp.tool(
-    name="Type",
-    description="Type on a specific cordinate",
-    annotations=ToolAnnotations(title="Type", destructiveHint=True),
-)
-def type_tool(text: str, x: int, y: int, clear: bool = False):
-    device = require_device()
-    device.set_fastinput_ime(enable=True)
-    device.send_keys(text=text, clear=clear)
-    return f'Typed "{text}" on ({x},{y})'
-
 
 @mcp.tool(
     name="Drag",
@@ -347,16 +293,6 @@ def drag_tool(x1: int, y1: int, x2: int, y2: int):
     device.drag(x1, y1, x2, y2)
     return f"Dragged from ({x1},{y1}) and dropped on ({x2},{y2})"
 
-
-@mcp.tool(
-    name="Press",
-    description="Press on specific button on the device",
-    annotations=ToolAnnotations(title="Press", destructiveHint=True),
-)
-def press_tool(button: str):
-    device = require_device()
-    device.press(button)
-    return f'Pressed the "{button}" button'
 
 
 @mcp.tool(
@@ -382,25 +318,6 @@ def wait_tool(duration: int):
     device.sleep(duration)
     return f"Waited for {duration} seconds"
 
-
-@mcp.tool(name='WaitForElement',description='Wait for an element to appear on screen. Use this instead of Wait when content is loading dynamically. Returns element info when found or error on timeout.',annotations=ToolAnnotations(title="Wait For Element",readOnlyHint=True))
-def wait_for_element_tool(text:str=None,resourceId:str=None,className:str=None,description:str=None,timeout:float=10.0):
-    device=require_device()
-    kwargs={}
-    if text: kwargs['text']=text
-    if resourceId: kwargs['resourceId']=_resolve_resource_id(device, resourceId)
-    if className: kwargs['className']=className
-    if description: kwargs['description']=description
-    if not kwargs:
-        return 'Error: at least one selector (text, resourceId, className, description) must be provided'
-    el=device(**kwargs)
-    if el.wait(timeout=timeout):
-        info=el.info
-        bounds=info.get('bounds',{})
-        cx=(bounds.get('left',0)+bounds.get('right',0))//2
-        cy=(bounds.get('top',0)+bounds.get('bottom',0))//2
-        return f'Element found: text="{info.get("text","")}" class={info.get("className","")} coords=({cx},{cy}) bounds=[{bounds.get("left",0)},{bounds.get("top",0)}][{bounds.get("right",0)},{bounds.get("bottom",0)}]'
-    return f'Element not found with selectors {kwargs} within {timeout}s'
 
 
 # App Management Tools
@@ -443,222 +360,6 @@ def list_apps_tool():
     except Exception as e:
         return f"Error listing apps: {str(e)}"
 
-
-# Advanced UI Tools
-@mcp.tool(name='Scroll', description='Scroll in a specific direction (up, down, left, right)', annotations=ToolAnnotations(title="Scroll", destructiveHint=True))
-def scroll_tool(direction: str, distance: int = 500):
-    try:
-        device = require_device()
-        if direction == "down":
-            device.swipe(540, 1500, 540, 1500 - distance)
-        elif direction == "up":
-            device.swipe(540, 1500 - distance, 540, 1500)
-        elif direction == "left":
-            device.swipe(1000, 1000, 1000 - distance, 1000)
-        elif direction == "right":
-            device.swipe(1000 - distance, 1000, 1000, 1000)
-        else:
-            return f"Invalid direction: {direction}. Use: up, down, left, right"
-        return f"Scrolled {direction}"
-    except Exception as e:
-        return f"Error scrolling: {str(e)}"
-
-@mcp.tool(name='MultiTap', description='Tap multiple times rapidly at a location', annotations=ToolAnnotations(title="Multi Tap", destructiveHint=True))
-def multi_tap_tool(x: int, y: int, count: int = 2):
-    try:
-        device = require_device()
-        for _ in range(count):
-            device.click(x, y)
-            device.sleep(0.1)
-        return f"Tapped {count} times at ({x}, {y})"
-    except Exception as e:
-        return f"Error multi-tapping: {str(e)}"
-
-
-# Helper functions for multi-click and multi-fill text tools
-def _execute_coordinate_click(device, x: int, y: int):
-    device.click(x, y)
-    return f"Clicked on ({x}, {y})"
-
-def _execute_selector_click(device, text: str = None, resourceId: str = None, className: str = None, description: str = None, index: int = 0, timeout: float = 5.0):
-    kwargs = {}
-    if text: kwargs['text'] = text
-    if resourceId: kwargs['resourceId'] = _resolve_resource_id(device, resourceId)
-    if className: kwargs['className'] = className
-    if description: kwargs['description'] = description
-    if not kwargs:
-        raise ValueError('At least one selector (text, resourceId, className, description) must be provided')
-    if index: kwargs['index'] = index
-    el = device(**kwargs)
-    if not el.wait(timeout=timeout):
-        raise ValueError(f'Element not found with selectors {kwargs} within {timeout}s')
-    el.click()
-    return f'Clicked element matching {kwargs}'
-
-def _execute_coordinate_fill_text(device, text: str, x: int, y: int):
-    device.set_fastinput_ime(enable=True)
-    device.send_keys(text=text, clear=True)
-    return f'Typed "{text}" at ({x}, {y})'
-
-def _execute_selector_fill_text(device, text: str, text_selector: str = None, resourceId: str = None, className: str = None, description: str = None, index: int = 0, timeout: float = 5.0):
-    kwargs = {}
-    if text_selector: kwargs['text'] = text_selector
-    if resourceId: kwargs['resourceId'] = _resolve_resource_id(device, resourceId)
-    if className: kwargs['className'] = className
-    if description: kwargs['description'] = description
-    if not kwargs:
-        raise ValueError('At least one selector (text, resourceId, className, description) must be provided')
-    if index: kwargs['index'] = index
-    el = device(**kwargs)
-    if not el.wait(timeout=timeout):
-        raise ValueError(f'Element not found with selectors {kwargs} within {timeout}s')
-    el.click()
-    device.set_fastinput_ime(enable=True)
-    device.send_keys(text=text, clear=True)
-    return f'Typed "{text}" in element matching {kwargs}'
-
-@mcp.tool(name='MultiClick', description='Click on multiple coordinates or elements in a single operation. Supports both coordinate-based (x, y) and selector-based (text, resourceId, className, description) actions. Continues execution even if individual actions fail.', annotations=ToolAnnotations(title="Multi Click", destructiveHint=True))
-def multi_click_tool(actions: list):
-    try:
-        device = require_device()
-        results = []
-        successful = 0
-        failed = 0
-        
-        for i, action in enumerate(actions):
-            action_type = action.get('type')
-            result = {
-                'index': i,
-                'type': action_type,
-                'status': 'success',
-                'details': ''
-            }
-            
-            try:
-                if action_type == 'coordinate':
-                    x = action.get('x')
-                    y = action.get('y')
-                    if x is None or y is None:
-                        raise ValueError('Coordinate actions require x and y parameters')
-                    result['details'] = _execute_coordinate_click(device, x, y)
-                    successful += 1
-                elif action_type == 'selector':
-                    text = action.get('text')
-                    resourceId = action.get('resourceId')
-                    className = action.get('className')
-                    description = action.get('description')
-                    index = action.get('index', 0)
-                    timeout = action.get('timeout', 5.0)
-                    result['details'] = _execute_selector_click(device, text, resourceId, className, description, index, timeout)
-                    successful += 1
-                else:
-                    raise ValueError(f'Unknown action type: {action_type}. Use "coordinate" or "selector"')
-            except Exception as e:
-                result['status'] = 'failed'
-                result['error'] = str(e)
-                result['details'] = action
-                failed += 1
-            
-            results.append(result)
-        
-        output = f"MultiClick completed: {successful}/{len(actions)} successful, {failed} failed\n"
-        output += "Results:\n"
-        for r in results:
-            status_emoji = "✓" if r['status'] == 'success' else "✗"
-            output += f"  {status_emoji} Action {r['index']} ({r['type']}): {r['status']}\n"
-            if r['status'] == 'failed':
-                output += f"    Error: {r.get('error', 'Unknown error')}\n"
-            else:
-                output += f"    {r['details']}\n"
-        
-        return output
-    except Exception as e:
-        return f"Error in MultiClick: {str(e)}"
-
-@mcp.tool(name='MultiFillText', description='Fill text in multiple form fields in a single operation. Each field is cleared before typing. Supports both coordinate-based (x, y) and selector-based (text, resourceId, className, description) actions. Continues execution even if individual actions fail.', annotations=ToolAnnotations(title="Multi Fill Text", destructiveHint=True))
-def multi_fill_text_tool(actions: list):
-    try:
-        device = require_device()
-        device.set_fastinput_ime(enable=True)
-        results = []
-        successful = 0
-        failed = 0
-        
-        for i, action in enumerate(actions):
-            action_type = action.get('type')
-            text = action.get('text')
-            result = {
-                'index': i,
-                'type': action_type,
-                'text': text,
-                'status': 'success',
-                'details': ''
-            }
-            
-            try:
-                if text is None:
-                    raise ValueError('All actions require a text parameter')
-                
-                if action_type == 'coordinate':
-                    x = action.get('x')
-                    y = action.get('y')
-                    if x is None or y is None:
-                        raise ValueError('Coordinate actions require x and y parameters')
-                    result['details'] = _execute_coordinate_fill_text(device, text, x, y)
-                    successful += 1
-                elif action_type == 'selector':
-                    text_selector = action.get('text_selector')
-                    resourceId = action.get('resourceId')
-                    className = action.get('className')
-                    description = action.get('description')
-                    index = action.get('index', 0)
-                    timeout = action.get('timeout', 5.0)
-                    result['details'] = _execute_selector_fill_text(device, text, text_selector, resourceId, className, description, index, timeout)
-                    successful += 1
-                else:
-                    raise ValueError(f'Unknown action type: {action_type}. Use "coordinate" or "selector"')
-            except Exception as e:
-                result['status'] = 'failed'
-                result['error'] = str(e)
-                result['details'] = action
-                failed += 1
-            
-            results.append(result)
-        
-        output = f"MultiFillText completed: {successful}/{len(actions)} successful, {failed} failed\n"
-        output += "Results:\n"
-        for r in results:
-            status_emoji = "✓" if r['status'] == 'success' else "✗"
-            output += f"  {status_emoji} Action {r['index']} ({r['type']}): {r['status']}\n"
-            if r['status'] == 'failed':
-                output += f"    Error: {r.get('error', 'Unknown error')}\n"
-            else:
-                output += f"    {r['details']}\n"
-        
-        return output
-    except Exception as e:
-        return f"Error in MultiFillText: {str(e)}"
-
-@mcp.tool(name='ScrollToElement', description='Scroll until an element is found', annotations=ToolAnnotations(title="Scroll To Element", destructiveHint=True))
-def scroll_to_element_tool(text: str = None, resourceId: str = None, max_scrolls: int = 5):
-    try:
-        device = require_device()
-        kwargs = {}
-        if text: kwargs['text'] = text
-        if resourceId: kwargs['resourceId'] = _resolve_resource_id(device, resourceId)
-        if not kwargs:
-            return 'Error: at least one selector (text or resourceId) must be provided'
-        
-        for i in range(max_scrolls):
-            el = device(**kwargs)
-            if el.wait(timeout=1):
-                return f"Element found after {i} scrolls"
-            device.swipe(540, 1500, 540, 1000)  # Scroll down
-            device.sleep(0.5)
-        
-        return f"Element not found after {max_scrolls} scrolls"
-    except Exception as e:
-        return f"Error scrolling to element: {str(e)}"
 
 
 @mcp.tool(name='PullToRefresh', description='Perform a pull-to-refresh gesture by scrolling to top and pulling down significantly to trigger refresh', annotations=ToolAnnotations(title="Pull To Refresh", destructiveHint=True))
@@ -750,16 +451,6 @@ def get_device_info_tool():
 
 
 # System Control Tools
-@mcp.tool(name='ToggleWiFi', description='Turn WiFi on or off', annotations=ToolAnnotations(title="Toggle WiFi", destructiveHint=True))
-def toggle_wifi_tool(state: str):
-    try:
-        if state not in ["on", "off"]:
-            return "Error: state must be 'on' or 'off'"
-        subprocess.run(['adb', 'shell', 'svc', 'wifi', state], timeout=15)
-        return f"WiFi turned {state}"
-    except Exception as e:
-        return f"Error toggling WiFi: {str(e)}"
-
 @mcp.tool(name='SetOrientation', description='Set screen orientation (portrait, landscape, auto)', annotations=ToolAnnotations(title="Set Orientation", destructiveHint=True))
 def set_orientation_tool(orientation: str):
     try:
@@ -786,100 +477,6 @@ def press_key_tool(key: str):
         return f"Error pressing key: {str(e)}"
 
 
-# Advanced Features
-@mcp.tool(name='GetElementParent', description='Get parent of an element by selector', annotations=ToolAnnotations(title="Get Element Parent", readOnlyHint=True))
-def get_element_parent_tool(text: str = None, resourceId: str = None):
-    try:
-        device = require_device()
-        kwargs = {}
-        if text: kwargs['text'] = text
-        if resourceId: kwargs['resourceId'] = _resolve_resource_id(device, resourceId)
-        if not kwargs:
-            return 'Error: at least one selector (text or resourceId) must be provided'
-        
-        el = device(**kwargs)
-        if not el.wait(timeout=5):
-            return f"Element not found with selectors {kwargs}"
-        
-        parent = el.parent
-        if parent:
-            parent_info = parent.info
-            return f"Parent: text='{parent_info.get('text')}' class={parent_info.get('className')}"
-        return "No parent found"
-    except Exception as e:
-        return f"Error getting element parent: {str(e)}"
-
-@mcp.tool(name='VerifyText', description='Verify if text exists on screen', annotations=ToolAnnotations(title="Verify Text", readOnlyHint=True))
-def verify_text_tool(text: str, should_exist: bool = True):
-    try:
-        device = require_device()
-        xml = device.dump_hierarchy()
-        exists = text in xml
-        if should_exist:
-            return f"Text '{text}' {'found' if exists else 'not found'}"
-        else:
-            return f"Text '{text}' {'not found' if not exists else 'found (unexpected)'}"
-    except Exception as e:
-        return f"Error verifying text: {str(e)}"
-
-@mcp.tool(name='GetElementInfo', description='Get detailed information about an element by selector', annotations=ToolAnnotations(title="Get Element Info", readOnlyHint=True))
-def get_element_info_tool(text: str = None, resourceId: str = None):
-    try:
-        device = require_device()
-        kwargs = {}
-        if text: kwargs['text'] = text
-        if resourceId: kwargs['resourceId'] = _resolve_resource_id(device, resourceId)
-        if not kwargs:
-            return 'Error: at least one selector (text or resourceId) must be provided'
-        
-        el = device(**kwargs)
-        if not el.wait(timeout=5):
-            return f"Element not found with selectors {kwargs}"
-        
-        info = el.info
-        output = f"Text: {info.get('text')}\n"
-        output += f"Class: {info.get('className')}\n"
-        output += f"Resource ID: {info.get('resourceId')}\n"
-        output += f"Clickable: {info.get('clickable')}\n"
-        output += f"Enabled: {info.get('enabled')}\n"
-        output += f"Bounds: {info.get('bounds')}\n"
-        return output
-    except Exception as e:
-        return f"Error getting element info: {str(e)}"
-
-@mcp.tool(name='SwipeElement', description='Swipe on a specific element', annotations=ToolAnnotations(title="Swipe Element", destructiveHint=True))
-def swipe_element_tool(text: str = None, resourceId: str = None, direction: str = "down", distance: int = 500):
-    try:
-        device = require_device()
-        kwargs = {}
-        if text: kwargs['text'] = text
-        if resourceId: kwargs['resourceId'] = _resolve_resource_id(device, resourceId)
-        if not kwargs:
-            return 'Error: at least one selector (text or resourceId) must be provided'
-        
-        el = device(**kwargs)
-        if not el.wait(timeout=5):
-            return f"Element not found with selectors {kwargs}"
-        
-        bounds = el.info.get('bounds', {})
-        x = (bounds.get('left', 0) + bounds.get('right', 0)) // 2
-        y = (bounds.get('top', 0) + bounds.get('bottom', 0)) // 2
-        
-        if direction == "down":
-            device.swipe(x, y, x, y + distance)
-        elif direction == "up":
-            device.swipe(x, y, x, y - distance)
-        elif direction == "left":
-            device.swipe(x, y, x - distance, y)
-        elif direction == "right":
-            device.swipe(x, y, x + distance, y)
-        else:
-            return f"Invalid direction: {direction}. Use: up, down, left, right"
-        
-        return f"Swiped {direction} on element"
-    except Exception as e:
-        return f"Error swiping element: {str(e)}"
-
 @mcp.tool(name='WaitForActivity', description='Wait for a specific activity to be in foreground', annotations=ToolAnnotations(title="Wait For Activity", readOnlyHint=True))
 def wait_for_activity_tool(activity_name: str, timeout: float = 10.0):
     try:
@@ -895,183 +492,256 @@ def wait_for_activity_tool(activity_name: str, timeout: float = 10.0):
         return f"Error waiting for activity: {str(e)}"
 
 
-# Specialized Tools
-@mcp.tool(name='GetBatteryInfo', description='Get battery information', annotations=ToolAnnotations(title="Get Battery Info", readOnlyHint=True))
-def get_battery_info_tool():
+# Jev (TypeSafe System One) fast-decision tools
+# Jev makes the per-step judgments (which element, which action, done yet) in one
+# ~0.3s parallel call; code owns the loop and execution; you (the LLM) supply
+# goals and any text through the tool arguments.
+def _jev_unavailable() -> Optional[str]:
+    if not jev.sdk_available:
+        return "typesafe-sdk is not installed. Add it with `uv add typesafe-sdk`."
+    if not jev.is_configured:
+        return (
+            "TYPESAFE_API_KEY is not set. Get a key at "
+            "https://console.typesafe.ai/settings/keys and add it to the MCP "
+            "server environment. Until then use Snapshot + the standard tools."
+        )
+    return None
+
+
+def _jev_execute(device, decision: dict, text_to_type: Optional[str] = None) -> str:
+    action = decision.get("action")
+    el = decision.get("element")
+    if action == "tap_element":
+        if el is None:
+            return "no tap target chosen"
+        device.click(el.coordinates.x, el.coordinates.y)
+        return (f"tapped element {decision['element_index']} '{el.name}' "
+                f"at ({el.coordinates.x},{el.coordinates.y})")
+    if action == "type_text":
+        if el is None:
+            return "no type target chosen"
+        if text_to_type is None:
+            return "type_text chosen but no text_to_type was provided"
+        device.click(el.coordinates.x, el.coordinates.y)
+        device.sleep(0.3)
+        device.set_fastinput_ime(enable=True)
+        device.send_keys(text=text_to_type, clear=True)
+        jev.mark_typed(el)
+        return (f"typed \"{text_to_type}\" into element "
+                f"{decision['element_index']} '{el.name}'")
+    if action == "scroll_down":
+        device.swipe(540, 1500, 540, 800)
+        return "scrolled down"
+    if action == "scroll_up":
+        device.swipe(540, 800, 540, 1500)
+        return "scrolled up"
+    if action == "go_back":
+        device.press("back")
+        return "pressed back"
+    if action == "go_home":
+        device.press("home")
+        return "pressed home"
+    if action == "press_enter":
+        device.press("enter")
+        return "pressed enter"
+    if action == "wait":
+        device.sleep(1.5)
+        return "waited 1.5s"
+    return f"no execution needed for action '{action}'"
+
+
+def _format_alts(alts: list) -> str:
+    return ", ".join(f"{a['option']} ({a['probability']})" for a in alts)
+
+
+@mcp.tool(name='JevStatus', description='Check whether the Jev fast-decision layer is ready: typesafe-sdk installed, TYPESAFE_API_KEY set, model and element cap.', annotations=ToolAnnotations(title="Jev Status", readOnlyHint=True))
+def jev_status_tool():
+    s = jev.status
+    lines = [
+        f"configured: {s['configured']}",
+        f"sdk_installed: {s['sdk_installed']}",
+        f"model: {s['model']}",
+        f"max_elements: {s['max_elements']}",
+    ]
+    if not s["sdk_installed"]:
+        lines.append("Install with: uv add typesafe-sdk")
+    if not s["configured"]:
+        lines.append("Set TYPESAFE_API_KEY in the MCP server environment.")
+    return "\n".join(lines)
+
+
+@mcp.tool(name='JevTap', description='Tap the on-screen element matching a natural-language description (e.g. "the search icon", "Sign in button"). Jev decides which element in one fast call — much faster than reading a Snapshot and clicking by hand. When unsure it returns candidates instead of tapping blindly.', annotations=ToolAnnotations(title="Jev Tap", destructiveHint=True))
+def jev_tap_tool(target: str):
+    guard = _jev_unavailable()
+    if guard:
+        return guard
+    device = require_device()
     try:
-        result = subprocess.run(['adb', 'shell', 'dumpsys', 'battery'], capture_output=True, text=True, timeout=10)
-        return result.stdout
+        res = jev.pick_element(target)
     except Exception as e:
-        return f"Error getting battery info: {str(e)}"
+        return f"Jev decision failed: {e}"
+    if not res["found"] or res["confidence"] < 0.3:
+        alts = _format_alts(res["alternatives"])
+        return (
+            f"Jev found no confident match for '{target}' "
+            f"(presence={res['presence']}, confidence={res['confidence']}, "
+            f"elements={res['element_count']}). Top candidates: {alts}. "
+            "Rephrase the target, take a Snapshot, or use Click with coordinates."
+        )
+    el = res["element"]
+    device.click(el.coordinates.x, el.coordinates.y)
+    return (
+        f"Jev tapped element {res['element_index']} '{el.name}' "
+        f"at ({el.coordinates.x},{el.coordinates.y}) "
+        f"(presence={res['presence']}, confidence={res['confidence']})"
+    )
 
-@mcp.tool(name='TakeScreenshot', description='Take a screenshot and save to device', annotations=ToolAnnotations(title="Take Screenshot", destructiveHint=True))
-def take_screenshot_tool(filename: str = "screenshot.png"):
+
+@mcp.tool(name='JevType', description='Type text into the best-matching input field on screen. You supply the text; Jev picks the field, focuses it, and code types. Optionally describe the field (e.g. "search box") to disambiguate when several inputs exist.', annotations=ToolAnnotations(title="Jev Type", destructiveHint=True))
+def jev_type_tool(text: str, field: Optional[str] = None):
+    guard = _jev_unavailable()
+    if guard:
+        return guard
+    device = require_device()
+    target = field or f"the text input field that should receive: {text!r}"
     try:
-        device = require_device()
-        device.screenshot(filename)
-        return f"Screenshot saved to {filename}"
+        res = jev.pick_element(target)
     except Exception as e:
-        return f"Error taking screenshot: {str(e)}"
+        return f"Jev decision failed: {e}"
+    if not res["found"]:
+        alts = _format_alts(res["alternatives"])
+        return (
+            f"Jev found no confident field match "
+            f"(presence={res['presence']}, confidence={res['confidence']}). "
+            f"Top candidates: {alts}. Pass a `field` description or use Snapshot."
+        )
+    el = res["element"]
+    device.click(el.coordinates.x, el.coordinates.y)
+    device.sleep(0.3)
+    device.set_fastinput_ime(enable=True)
+    device.send_keys(text=text, clear=True)
+    jev.mark_typed(el)
+    return (
+        f"Jev typed \"{text}\" into element {res['element_index']} '{el.name}' "
+        f"(confidence={res['confidence']})"
+    )
 
-@mcp.tool(name='GetNetworkInfo', description='Get network connection information', annotations=ToolAnnotations(title="Get Network Info", readOnlyHint=True))
-def get_network_info_tool():
+
+@mcp.tool(name='JevStep', description='Let Jev decide and execute ONE action toward a goal on the current screen (tap, type, scroll, back, home, enter, wait, done). One Jev call picks both the action and its target — far faster than reading a Snapshot yourself. Use JevRun to loop automatically.', annotations=ToolAnnotations(title="Jev Step", destructiveHint=True))
+def jev_step_tool(goal: str, text_to_type: Optional[str] = None, context: Optional[str] = None):
+    guard = _jev_unavailable()
+    if guard:
+        return guard
+    device = require_device()
     try:
-        result = subprocess.run(['adb', 'shell', 'dumpsys', 'connectivity'], capture_output=True, text=True, timeout=10)
-        return result.stdout[:2000]  # Limit output
+        res = jev.decide_step(goal, context=context, text_to_type=text_to_type)
     except Exception as e:
-        return f"Error getting network info: {str(e)}"
-
-
-# Network Inspection Tools
-@mcp.tool(name='GetAPILogs', description='Get logs related to API calls from the app. Filters logcat for HTTP requests, network operations, and API calls.', annotations=ToolAnnotations(title="Get API Logs", readOnlyHint=True))
-def get_api_logs_tool(package_name: str = None, lines: int = 100):
+        return f"Jev decision failed: {e}"
+    action = res["action"]
+    if action == "done":
+        return (f"JevStep: goal already achieved "
+                f"(goal_achieved={res['goal_achieved']}).")
+    if action == "give_up" or res.get("reason") == "no_elements":
+        alts = _format_alts(res.get("alternatives", []))
+        return (f"JevStep: cannot progress toward goal from this screen. "
+                f"Action probabilities: {alts}. Take over with Snapshot.")
     try:
-        # Filter for network-related logs
-        filters = [
-            'okhttp',
-            'http',
-            'HttpURLConnection',
-            'Retrofit',
-            'Volley',
-            'API',
-            'network',
-            'request',
-            'response'
-        ]
-        
-        cmd = ['adb', 'logcat', '-d', '-v', 'time']
-        if package_name:
-            cmd.extend(['|', 'grep', package_name])
+        detail = _jev_execute(device, res, text_to_type)
+    except Exception as e:
+        return f"JevStep: '{action}' execution failed: {e}"
+    out = (f"JevStep → {action}: {detail} "
+           f"(goal_achieved={res['goal_achieved']}, confidence={res['confidence']})")
+    if res.get("needs_text") and res["needs_text"] >= 0.6 and text_to_type is None:
+        out += (f"\nNote: Jev reports this screen likely needs text input "
+                f"(needs_text={res['needs_text']}). Re-call with text_to_type=<text>.")
+    return out
+
+
+@mcp.tool(name='JevRun', description='Autonomously drive the device toward a goal: Jev repeatedly decides the next action (tap/type/scroll/back/enter/wait) and code executes it — each decision is a single ~0.3s call, far faster than an LLM reading Snapshots. Stops on done, give_up, or max_steps. If text may be needed, pass text_to_type; otherwise it pauses and asks you for the text. On give_up it returns context so you can take over with Snapshot.', annotations=ToolAnnotations(title="Jev Run", destructiveHint=True))
+def jev_run_tool(goal: str, text_to_type: Optional[str] = None, max_steps: int = 8, context: Optional[str] = None):
+    guard = _jev_unavailable()
+    if guard:
+        return guard
+    device = require_device()
+    log = []
+    recent = []
+    last_key = None
+    repeats = 0
+    prev_screen = None
+    for step in range(max_steps):
+        try:
+            res = jev.decide_step(goal, context=context, text_to_type=text_to_type,
+                                  recent_actions=recent)
+        except Exception as e:
+            log.append(f"{step + 1}. decision failed: {e}")
+            return "JevRun stopped: Jev decision failed.\n" + "\n".join(log)
+
+        action = res["action"]
+        if action == "done":
+            log.append(f"{step + 1}. done (goal_achieved={res['goal_achieved']})")
+            return (f"JevRun finished: goal achieved in {step + 1} step(s).\n"
+                    + "\n".join(log))
+        if res.get("reason") == "no_elements":
+            return ("JevRun stopped: no interactive elements on screen. "
+                    "Take a Snapshot to see what is shown.\n" + "\n".join(log))
+        if action == "give_up":
+            alts = _format_alts(res.get("alternatives", []))
+            return (f"JevRun stopped at step {step + 1}: Jev cannot progress "
+                    f"toward the goal from this screen (probabilities: {alts}). "
+                    "Take over with Snapshot or rephrase the goal.\n" + "\n".join(log))
+        if res.get("needs_text") and res["needs_text"] >= 0.6 and text_to_type is None:
+            return (f"JevRun paused at step {step + 1}: text input is required "
+                    f"(needs_text={res['needs_text']}). Re-run with "
+                    "text_to_type=<the text to enter>.\n" + "\n".join(log))
+
+        key = (action, res.get("element_index"), res.get("screen_key"))
+        if key == last_key:
+            repeats += 1
+            if repeats >= 2:
+                return ("JevRun stopped: the same action repeated without the "
+                        "screen changing (possible loop). Take over with Snapshot.\n"
+                        + "\n".join(log))
         else:
-            # Add grep for network-related keywords
-            filter_str = '|'.join(filters)
-            cmd.extend(['|', 'grep', '-i', f'-E', f'({filter_str})'])
-        
-        cmd.extend(['|', 'tail', '-n', str(lines)])
-        
-        result = subprocess.run(' '.join(cmd), shell=True, capture_output=True, text=True, timeout=30)
-        
-        if not result.stdout:
-            return "No API logs found. Make sure the app is making network requests and debug logging is enabled."
-        
-        return result.stdout
-    except Exception as e:
-        return f"Error getting API logs: {str(e)}"
+            repeats = 0
+        last_key = key
 
-@mcp.tool(name='StartAPILogger', description='Start logging API requests/responses by clearing logs and preparing for capture', annotations=ToolAnnotations(title="Start API Logger", destructiveHint=True))
-def start_api_logger_tool(package_name: str = None):
-    try:
-        # Clear logcat to start fresh
-        subprocess.run(['adb', 'logcat', '-c'], timeout=10)
-        
-        # Enable verbose logging for network operations if possible
-        if package_name:
-            # Set log level for specific package
-            subprocess.run(['adb', 'shell', 'setprop', 'log.tag.okhttp', 'DEBUG'], timeout=5)
-            subprocess.run(['adb', 'shell', 'setprop', 'log.tag.Retrofit', 'DEBUG'], timeout=5)
-        
-        return "API logger started. Navigate to the page and use StopAPILogger to capture the API calls."
-    except Exception as e:
-        return f"Error starting API logger: {str(e)}"
+        try:
+            detail = _jev_execute(device, res, text_to_type)
+        except Exception as e:
+            log.append(f"{step + 1}. {action} FAILED: {e}")
+            return (f"JevRun stopped on execution error at step {step + 1}.\n"
+                    + "\n".join(log))
 
-@mcp.tool(name='StopAPILogger', description='Stop logging API requests/responses and return captured data', annotations=ToolAnnotations(title="Stop API Logger", readOnlyHint=True))
-def stop_api_logger_tool(package_name: str = None, lines: int = 200):
-    try:
-        filters = [
-            'okhttp',
-            'http',
-            'HttpURLConnection',
-            'Retrofit',
-            'Volley',
-            'API',
-            'network',
-            'request',
-            'response',
-            'url',
-            'endpoint'
-        ]
-        
-        cmd = ['adb', 'logcat', '-d', '-v', 'time']
-        if package_name:
-            cmd.extend(['|', 'grep', package_name])
-        else:
-            filter_str = '|'.join(filters)
-            cmd.extend(['|', 'grep', '-i', f'-E', f'({filter_str})'])
-        
-        cmd.extend(['|', 'tail', '-n', str(lines)])
-        
-        result = subprocess.run(' '.join(cmd), shell=True, capture_output=True, text=True, timeout=30)
-        
-        if not result.stdout:
-            return "No API logs captured. Make sure network requests were made after starting the logger."
-        
-        # Parse and format the output
-        lines_list = result.stdout.split('\n')
-        api_calls = []
-        
-        for line in lines_list:
-            if any(keyword.lower() in line.lower() for keyword in ['http', 'url', 'request', 'response', 'endpoint']):
-                api_calls.append(line)
-        
-        output = "=== Captured API Calls ===\n"
-        output += f"Total API-related log entries: {len(api_calls)}\n\n"
-        output += "\n".join(api_calls[:50])  # Limit to 50 entries
-        
-        return output
-    except Exception as e:
-        return f"Error stopping API logger: {str(e)}"
+        unchanged = prev_screen is not None and res.get("screen_key") == prev_screen
+        note = f"{step + 1}. {action}: {detail}"
+        if unchanged:
+            note += " (screen unchanged)"
+        log.append(note)
+        recent.append(
+            action
+            + (f" on '{res['element'].name}'" if res.get("element") else "")
+            + (" - screen unchanged" if unchanged else "")
+        )
+        prev_screen = res.get("screen_key")
+        device.sleep(0.8)
 
-@mcp.tool(name='GetAPIResponse', description='Extract response data from API logs. Use after StopAPILogger to get specific response details.', annotations=ToolAnnotations(title="Get API Response", readOnlyHint=True))
-def get_api_response_tool(package_name: str = None, search_term: str = None):
-    try:
-        cmd = ['adb', 'logcat', '-d', '-v', 'time']
-        
-        if package_name:
-            cmd.extend(['|', 'grep', package_name])
-        
-        if search_term:
-            cmd.extend(['|', 'grep', '-i', search_term])
-        
-        result = subprocess.run(' '.join(cmd), shell=True, capture_output=True, text=True, timeout=30)
-        
-        if not result.stdout:
-            return "No response data found. Make sure API calls were made and use StopAPILogger first."
-        
-        # Filter for response-related logs
-        lines_list = result.stdout.split('\n')
-        responses = []
-        
-        for line in lines_list:
-            if any(keyword.lower() in line.lower() for keyword in ['response', '200', '201', 'error', 'fail', 'success']):
-                responses.append(line)
-        
-        output = "=== API Response Data ===\n"
-        output += "\n".join(responses[:30])  # Limit to 30 entries
-        
-        return output
-    except Exception as e:
-        return f"Error getting API response: {str(e)}"
+    return (f"JevRun reached max_steps={max_steps} without a 'done' decision. "
+            "Continue with JevRun/JevStep or take over with Snapshot.\n"
+            + "\n".join(log))
 
-@mcp.tool(name='SetProxy', description='Set HTTP/HTTPS proxy for device to intercept API traffic (requires proxy server like Charles/Fiddler)', annotations=ToolAnnotations(title="Set Proxy", destructiveHint=True))
-def set_proxy_tool(host: str, port: int):
-    try:
-        # Set global HTTP proxy
-        subprocess.run(['adb', 'shell', 'settings', 'put', 'global', 'http_proxy', f'{host}:{port}'], timeout=10)
-        subprocess.run(['adb', 'shell', 'settings', 'put', 'global', 'https_proxy', f'{host}:{port}'], timeout=10)
-        
-        return f"Proxy set to {host}:{port}. Note: This may require additional SSL certificate installation for HTTPS traffic."
-    except Exception as e:
-        return f"Error setting proxy: {str(e)}"
 
-@mcp.tool(name='ClearProxy', description='Clear HTTP/HTTPS proxy settings from device', annotations=ToolAnnotations(title="Clear Proxy", destructiveHint=True))
-def clear_proxy_tool():
+@mcp.tool(name='JevCheck', description='Ask Jev a yes/no question about the current screen (e.g. "is the user logged in?", "did the message send?", "is an error dialog shown?"). Returns yes/no/uncertain with a probability — fast verification without reading a Snapshot.', annotations=ToolAnnotations(title="Jev Check", readOnlyHint=True))
+def jev_check_tool(question: str):
+    guard = _jev_unavailable()
+    if guard:
+        return guard
+    require_device()
     try:
-        subprocess.run(['adb', 'shell', 'settings', 'put', 'global', 'http_proxy', ':0'], timeout=10)
-        subprocess.run(['adb', 'shell', 'settings', 'put', 'global', 'https_proxy', ':0'], timeout=10)
-        
-        return "Proxy settings cleared."
+        res = jev.judge(question)
     except Exception as e:
-        return f"Error clearing proxy: {str(e)}"
+        return f"Jev decision failed: {e}"
+    return f"Jev verdict: {res['verdict']} (probability={res['probability']})"
+
 
 def main():
     mcp.run()

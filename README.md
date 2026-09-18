@@ -82,35 +82,59 @@ Restart your IDE to load the MCP server. You should now be able to control your 
 
 AI assistants can use these tools to control your phone:
 
+**Fast Mode (Jev — recommended):**
+- Describe a goal and Jev drives the device step-by-step (`JevRun`, `JevStep`)
+- Tap elements by plain-English description (`JevTap`)
+- Type into the right field automatically (`JevType`)
+- Ask yes/no questions about the screen (`JevCheck`)
+
 **Basic Actions:**
-- Click, tap, and long press on screen elements
-- Type text into input fields
-- Swipe and scroll
+- Click, long press, swipe, and drag
 - Press buttons (back, home, volume)
-- Take screenshots
+- Pull to refresh
+- Read notifications
+- See the screen state (`Snapshot`)
 
 **App Control:**
 - Launch any app
 - Close apps
-- See what app is running
+- See what app is running and wait for activities
 - List installed apps
+- Set screen orientation
 
 **Advanced:**
-- Find and click elements by text or ID
-- Scroll until finding specific elements
-- Pull to refresh
-- Wait for elements to appear
-- Read notifications
-- Copy and paste text
+- Copy and paste text (clipboard)
 - Run shell commands
-- Get device logs
-- Check battery and network status
-- Inspect API calls from apps
+- Get device logs and device info
 
-**Network Debugging:**
-- See what APIs apps are calling
-- Capture HTTP requests and responses
-- Set up proxy to intercept network traffic
+## Jev Fast Mode (Optional)
+
+Android Control can use [Jev](https://typesafe.ai), TypeSafe's System One decision model, to make on-screen decisions in ~0.3s each — instead of your AI assistant reading a Snapshot and reasoning over it on every step. Jev never generates text; it picks among candidates the code supplies, so it can't hallucinate element names or coordinates.
+
+- **JevTap** — "tap the search icon": Jev picks the element, code taps it
+- **JevType** — you supply the text, Jev picks the field and code types
+- **JevStep** — Jev decides and executes one action toward a goal
+- **JevRun** — Jev loops decide→execute until the goal is done, it gives up, or it needs you to supply text (`needs_text`)
+- **JevCheck** — yes/no questions about the screen ("is the user logged in?")
+- **JevStatus** — check setup
+
+To enable it, add your TypeSafe API key to the MCP server environment:
+
+```json
+{
+  "mcpServers": {
+    "android-control": {
+      "command": "uvx",
+      "args": ["--python", "3.13", "--from", "git+https://github.com/SomeshSampat2/android-control.git", "android-control"],
+      "env": {
+        "TYPESAFE_API_KEY": "your-key-here"
+      }
+    }
+  }
+}
+```
+
+Get a key at <https://console.typesafe.ai/settings/keys>. Optional env vars: `TYPESAFE_DEFAULT_MODEL` (default `jev-latest`) and `JEV_MAX_ELEMENTS` (default 40). If Jev isn't configured, all standard tools work exactly as before.
 
 ## WiFi Connection (Optional)
 

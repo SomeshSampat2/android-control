@@ -6,6 +6,7 @@ from PIL import Image
 import subprocess
 import base64
 import os
+import time
 from typing import Optional
 
 class Mobile:
@@ -68,16 +69,24 @@ class Mobile:
             value = f"{value}:5555"
         return value
 
-    def connect(self,serial:str):
-        try:
-            self.device = u2.connect(serial)
-            self.device.info
-        except u2.ConnectError as e:
-            self.device = None
-            raise ConnectionError(f"Failed to connect to device {serial}: {e}")
-        except Exception as e:
-            self.device = None
-            raise RuntimeError(f"Unexpected error connecting to device {serial}: {e}")
+    def connect(self,serial:str,retries:int=3,delay:float=3.0):
+        last_error = None
+        for attempt in range(retries):
+            try:
+                self.device = u2.connect(serial)
+                self.device.info
+                return
+            except u2.ConnectError as e:
+                self.device = None
+                raise ConnectionError(f"Failed to connect to device {serial}: {e}")
+            except Exception as e:
+                # The on-device uiautomator stub can be briefly unavailable right
+                # after it (re)starts — retry instead of failing the tool call.
+                self.device = None
+                last_error = e
+                if attempt < retries - 1:
+                    time.sleep(delay)
+        raise RuntimeError(f"Unexpected error connecting to device {serial}: {last_error}")
 
     def disconnect(self):
         self.device = None

@@ -10,3 +10,5 @@ wheels/
 .venv
 *.mcpb
 notebook.ipynb
+# Local secrets
+.env
