@@ -8,6 +8,8 @@ class ElementNode:
     coordinates: 'CenterCord'
     bounding_box: 'BoundingBox'
     resource_id: str = ''
+    focused: bool = False
+    editable: bool = False
 
 @dataclass
 class BoundingBox:
